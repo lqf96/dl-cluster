@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  registry-mirror:
+    image: registry:2
+    deploy:
+      mode: global
+      restart_policy:
+        condition: on-failure
+    environment:
+      - REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+    network_mode: bridge
+    ports:
+      - 5000:5000

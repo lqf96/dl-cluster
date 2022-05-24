@@ -1,0 +1,9 @@
+[Unit]
+Description=NFS mount for DL cluster
+
+[Mount]
+What=dl-master-node.lan:/mnt/cluster
+Where=/mnt/cluster
+Type=nfs
+Options=nconnect=8
+TimeoutSec=5

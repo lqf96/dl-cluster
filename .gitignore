@@ -1,0 +1,13 @@
+# macOS files
+.DS_Store
+__MACOSX
+._*
+# Swap files
+*.swp
+
+# Python bytecode
+*.pyc
+__pycache__
+
+# Secrets
+secrets

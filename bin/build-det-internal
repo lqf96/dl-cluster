@@ -1,0 +1,35 @@
+#! /bin/sh
+
+# Determined fork settings
+DL_DET_REPO="https://github.com/lqf96/determined"
+DL_DET_BRANCH_PREFIX="direct-connectivity"
+
+# Go-related paths
+export GOPATH="/root/go"
+export PATH="/root/go/bin:/usr/local/go/bin:${PATH}"
+
+# Update package indices
+apt-get update
+# Install system dependencies
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    gcc g++ python3 protobuf-compiler libprotobuf-dev make \
+    ca-certificates curl git jq
+# Manually install Go 1.18.1 toolchain
+curl https://dl.google.com/go/go1.18.1.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+
+# Clone repository
+git clone "${DL_DET_REPO}" /root/determined
+cd /root/determined
+# Switch to fork branch
+git checkout "${DL_DET_BRANCH_PREFIX}-${DL_DET_VERSION}"
+
+# Fetch Go depedencies
+make get-deps-go
+# Build Determined master and agent
+make build-agent
+make build-master
+# Copy built binaries
+cp master/build/determined-master agent/build/determined-agent /build
+# Change ownership of binaries
+HOST_UID_GID="$(stat -c '%u:%g' /build)"
+chown "${HOST_UID_GID}" /build/determined-master /build/determined-agent

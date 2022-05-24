@@ -1,0 +1,16 @@
+port: 8080
+task_container_defaults:
+  network_mode: dl-cluster
+  direct_connectivity: true
+  image: lqf96/dl-cluster:ubuntu-20.04
+  bind_mounts:
+    - host_path: {{ env "DL_SHARED_DIR" }}
+      container_path: {{ env "DL_SHARED_DIR" }}
+  work_dir: /data
+cluster_name: nsl-cluster-1
+db:
+  host: db
+  name: determined
+  port: 5432
+  user: postgres
+  password: {{ secret "db-passwd" }}

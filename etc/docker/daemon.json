@@ -1,0 +1,16 @@
+{
+    "default-address-pools": [
+        {"base": "100.112.0.0/12", "size": 20}
+    ],
+    "default-runtime": "nvidia",
+    "registry-mirror": [
+        "http://dl-master-node.lan"
+    ],
+    "runtimes": {
+        "nvidia": {
+            "path": "/usr/bin/nvidia-container-runtime",
+            "runtimeArgs": []
+        }
+    },
+    "userland-proxy": false
+}

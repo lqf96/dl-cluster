@@ -1,0 +1,10 @@
+name: pytorch-1.11
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pytorch=1.11
+  - cudatoolkit=11.3
+  - numpy

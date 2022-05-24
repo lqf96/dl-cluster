@@ -1,0 +1,353 @@
+#! /usr/bin/env python3
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import glob, os, platform, secrets, shutil, subprocess, sys
+from collections.abc import Mapping
+from argparse import ArgumentParser
+from tempfile import TemporaryDirectory
+
+if TYPE_CHECKING:
+    from typing import Any, Optional, TextIO, Union
+    from collections.abc import Iterable, Iterator, Sequence
+
+# Root (repository) directory
+ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
+
+# Bold text
+PROMPT_BOLD = "\033[1m"
+# Colored text
+PROMPT_COLOR_RED = "\033[91m"
+PROMPT_COLOR_GREEN = "\033[92m"
+PROMPT_COLOR_WHITE = "\033[97m"
+# Reset text
+PROMPT_RESET = "\033[0m"
+
+class Arg:
+    def __init__(self, *names_or_flags: str, **kwargs: Any):
+        self.names_or_flags = names_or_flags
+        self.kwargs = kwargs
+
+class CommandGroup:
+    def __init__(self, cmds: Mapping[str, Command], **kwargs: Any):
+        self.cmds = cmds
+        self.kwargs = kwargs
+
+class Command:
+    def __init__(self, help: Optional[str] = None, args: Sequence[Arg] = (),
+        cmd_groups: Sequence[CommandGroup] = (), **parser_kwargs: Any):
+        self.help = help
+        self.args = args
+        self.cmd_groups = cmd_groups
+        self.parser_kwargs = parser_kwargs
+
+    def init_parser(self, parser: Optional[ArgumentParser] = None) -> ArgumentParser:
+        # Create parser
+        if parser is None:
+            parser = ArgumentParser(description=self.help, **self.parser_kwargs)
+
+        # Add arguments for command
+        for arg in self.args:
+            parser.add_argument(*arg.names_or_flags, **arg.kwargs)
+        # Create and initialize sub-parsers
+        for cmd_group in self.cmd_groups:
+            sub_parsers = parser.add_subparsers(**cmd_group.kwargs)
+            for name, cmd in cmd_group.cmds.items():
+                cmd.init_parser(sub_parsers.add_parser(
+                    name, description=cmd.help, help=cmd.help, **cmd.parser_kwargs
+                ))
+        
+        return parser
+
+def prompt(text: str, color_seq: str = PROMPT_COLOR_GREEN, file: TextIO = sys.stdout):
+    # Make prompt bold and colored for terminal
+    if file.isatty():
+        text = f"{PROMPT_BOLD}{color_seq}==>{PROMPT_COLOR_WHITE} {text}{PROMPT_RESET}"
+    # Plain prompt
+    else:
+        text = f"==> {text}"
+    # Print text to file
+    print(text, file=file)
+
+def run(program: str, *args: str):
+    # Resolve program path
+    program = shutil.which(program) or program
+    # Run program
+    proc = subprocess.run((program,)+args, stdout=sys.stdout, stderr=sys.stderr)
+    # Print error and exit early if command fails
+    if proc.returncode!=0:
+        prompt(f"Error: Command {proc.args} returned with code {proc.returncode}", color_seq=PROMPT_COLOR_RED)
+        exit(1)
+
+def args_list(flag: str, args: Union[Iterable[str], Mapping[str, str]]) -> Iterator[str]:
+    # Concatenate key-value pair into a single argument
+    if isinstance(args, Mapping):
+        args = (f"{key}={value}" for key, value in args.items())
+    # Interleave flags with arguments
+    for arg in args:
+        yield flag
+        yield arg
+
+def mkdirp(*paths: str):
+    for path in paths:
+        os.makedirs(path, exist_ok=True)
+
+# Registry mirror service directory
+REGISTRY_SERVICE_DIR = f"{ROOT_DIR}/services/registry-mirror"
+
+def registry_start():
+    prompt("Starting registry mirror service ...")
+    run("docker-compose", "--project-directory", REGISTRY_SERVICE_DIR, "up", "-d")
+
+def registry_status():
+    run("docker-compose", "--project-directory", REGISTRY_SERVICE_DIR, "ps")
+
+def registry_stop():
+    prompt("Stopping registry mirror service ...")
+    run("docker-compose", "--project-directory", REGISTRY_SERVICE_DIR, "down")
+
+# Cluster service stack directory
+CLUSTER_SERVICE_NAME = "dl-cluster"
+# Cluster service stack name
+CLUSTER_SERVICE_FILE = f"{ROOT_DIR}/services/cluster/docker-compose.yml"
+
+def cluster_start(shared_dir: str, det_version: str):
+    # Set variables for service stack
+    os.environ["DL_CLUSTER_MASTER"] = platform.node()
+    os.environ["DL_DET_VERSION"] = det_version
+    os.environ["DL_SHARED_DIR"] = shared_dir
+    # Start service stack
+    prompt("Starting cluster service stack ...")
+    run("docker", "stack", "deploy", "-c", CLUSTER_SERVICE_FILE, CLUSTER_SERVICE_NAME)
+
+def cluster_status():
+    run("docker", "stack", "ps", CLUSTER_SERVICE_NAME)
+
+def cluster_stop():
+    prompt("Stopping cluster service stack ...")
+    run("docker", "stack", "rm", CLUSTER_SERVICE_NAME)
+
+def build_env_image(image_ns: str, base_image: str, shared_dir: str):
+    # Generate environment image tag from base image name
+    image_tag = base_image.replace(":", "-")
+    # Build arguments
+    build_args = {
+        "DL_BASE_IMAGE": base_image,
+        "DL_SHARED_DIR": shared_dir
+    }
+
+    # Build environment image
+    prompt(f"Building Determined environment image based on '{base_image}' ...")
+    run(
+        "docker", "build", "-t", f"{image_ns}/dl-cluster:{image_tag}",
+        *args_list("--build-arg", build_args), f"{ROOT_DIR}/images/dl-cluster"
+    )
+
+def make_det_image(role: str, det_version: str, image_ns: str, build_dir: str):
+    # Generate random temporary container name
+    container_name = f"tmp-{secrets.token_hex(8)}"
+
+    # Create temporary container
+    run(
+        "docker", "create", "--name", container_name,
+        f"determinedai/determined-{role}:{det_version}"
+    )
+    # Copy binary to container
+    run("docker", "cp", f"{build_dir}/determined-{role}", f"{container_name}:/usr/bin")
+    # Commit container as image
+    run("docker", "commit", container_name, f"{image_ns}/determined-{role}:{det_version}")
+    # Remove temporary container
+    run("docker", "rm", container_name)
+
+# Script for building Determined Go binaries
+DET_BUILD_SCRIPT_FILE = "build-det-internal"
+
+def build_det_images(build_image: str, det_version: str, image_ns: str):
+    with TemporaryDirectory() as build_dir:
+        # Bind mounts for container
+        bind_mounts = (
+            f"{ROOT_DIR}/bin/{DET_BUILD_SCRIPT_FILE}:/usr/local/bin/{DET_BUILD_SCRIPT_FILE}",
+            f"{build_dir}:/build"
+        )
+        # Environment variables for containers
+        envs = {
+            "DL_DET_VERSION": det_version
+        }
+
+        # Run build steps in container
+        prompt(f"Building Determined binaries in container ...")
+        run(
+            "docker", "run", "--rm", "-it", *args_list("-v", bind_mounts),
+            *args_list("-e", envs), build_image, DET_BUILD_SCRIPT_FILE
+        )
+        # Create master image
+        prompt(f"Creating master image ...")
+        make_det_image("master", det_version, image_ns, build_dir)
+        # Make agent image
+        prompt(f"Creating agent image ...")
+        make_det_image("agent", det_version, image_ns, build_dir)
+
+# Conda packages needed by Determined
+DET_CONDA_PACKAGES = (
+    "jupyterlab",
+    "jupyter-archive",
+    "tensorboard",
+    "nb_conda_kernels"
+)
+
+def init_shared_dir(conda_installer: str, shared_dir: str, det_version: str):
+    prompt("Installing Conda and creating directory structure ...")
+    # Install Anaconda/Miniconda
+    run("sh", conda_installer, "-b", "-p", f"{shared_dir}/conda")
+    # Create directory structure
+    mkdirp(
+        f"{shared_dir}/cache/pip",
+        f"{shared_dir}/data",
+        f"{shared_dir}/envs"
+    )
+
+    prompt("Creating environment and installing packages for Determined ...")
+    # Create environment for Determined
+    run(f"{shared_dir}/conda/bin/conda", "create", "-y", "-n", "determined", "python=3.9")
+    # Install Conda packages needed by Determined
+    run(
+        f"{shared_dir}/conda/bin/conda", "install", "-y", "-n", "determined",
+        "-c", "conda-forge", *DET_CONDA_PACKAGES
+    )
+    # Install Determined Python package
+    run(
+        f"{shared_dir}/conda/envs/determined/bin/pip", "install",
+        f"--cache-dir={shared_dir}/cache/pip", f"determined=={det_version}"
+    )
+
+    # Create template environments from files
+    prompt("Creating template environments ...")
+    for env_file in glob.glob(f"{ROOT_DIR}/templates/*.yml"):
+        run(f"{shared_dir}/conda/bin/conda", "env", "create", "-y", "-f", env_file)
+
+# Default base image
+DEFAULT_IMAGE = "ubuntu:20.04"
+# Default cluster shared directory
+DEFAULT_SHARED_DIR = "/mnt/cluster"
+# Default Determined release version
+DEFAULT_DET_VERSION = "0.18.0"
+
+def main():
+    # CLI commands
+    commands = {
+        # [ Registry Service Management ]
+        "registry-start": Command(
+            help="Start Docker registry mirror service."
+        ),
+        "registry-status": Command(
+            help="Get status of Docker registry mirror service."
+        ),
+        "registry-stop": Command(
+            help="Stop Docker registry mirror service."
+        ),
+        # [ Cluster Service Stack Management ]
+        "cluster-start": Command(
+            help="Start DL cluster service stack.",
+            args=(
+                Arg(
+                    "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
+                    help="Path to cluster shared directory."
+                ),
+                Arg(
+                    "-v", "--det-version", default=DEFAULT_DET_VERSION,
+                    help="Version of Determined release."
+                )
+            )
+        ),
+        "cluster-status": Command(
+            help="Get status of DL cluster service stack."
+        ),
+        "cluster-stop": Command(
+            help="Stop DL cluster service stack."
+        ),
+        # [ Environment Preparation ]
+        "build-env-image": Command(
+            help="Build Determined container environment image.",
+            args=(
+                Arg(
+                    "-n", "--image-ns", required=True,
+                    help="Namespace of target image."
+                ),
+                Arg(
+                    "-b", "--base-image", default=DEFAULT_IMAGE,
+                    help="Base image to build from."
+                ),
+                Arg(
+                    "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
+                    help="Path to cluster shared directory."
+                )
+            )
+        ),
+        "build-det-images": Command(
+            help="Build Determined master and agent images.",
+            args=(
+                Arg(
+                    "-n", "--image-ns", required=True,
+                    help="Namespace of target images."
+                ),
+                Arg(
+                    "-b", "--build-image", default=DEFAULT_IMAGE,
+                    help="Image of temporary container to build Determined binaries."
+                ),
+                Arg(
+                    "-v", "--det-version", default=DEFAULT_DET_VERSION,
+                    help="Version of Determined release."
+                )
+            )
+        ),
+        "init-shared-dir": Command(
+            help="Initialize cluster shared directory.",
+            args=(
+                Arg(
+                    "-i", "--conda-installer", required=True,
+                    help="Path to Miniconda or Anaconda installer."
+                ),
+                Arg(
+                    "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
+                    help="Path to cluster shared directory."
+                ),
+                Arg(
+                    "-v", "--det-version", default=DEFAULT_DET_VERSION,
+                    help="Version of Determined release."
+                )
+            )
+        )
+    }
+    # Build CLI parser
+    parser = Command(
+        help="DL cluster management utilities.",
+        cmd_groups=(
+            CommandGroup(commands, dest="cmd", required=True),
+        )
+    ).init_parser()
+    # Parse CLI arguments
+    args = parser.parse_args()
+    
+    # Command handlers
+    command_handlers = {
+        # [ Registry Service Management ]
+        "registry-start": registry_start,
+        "registry-status": registry_status,
+        "registry-stop": registry_stop,
+        # [ Cluster Service Stack Management ]
+        "cluster-start": cluster_start,
+        "cluster-status": cluster_status,
+        "cluster-stop": cluster_stop,
+        # [ Environment Preparation ]
+        "build-env-image": build_env_image,
+        "build-det-images": build_det_images,
+        "init-shared-dir": init_shared_dir
+    }
+    # Find and invoke command handler
+    args_dict = args.__dict__
+    cmd_name = args_dict.pop("cmd")
+    command_handlers[cmd_name](**args_dict)
+
+if __name__=="__main__":
+    main()

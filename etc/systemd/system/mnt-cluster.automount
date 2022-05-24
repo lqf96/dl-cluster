@@ -1,0 +1,8 @@
+[Unit]
+Description=NFS automount for DL cluster
+
+[Automount]
+Where=/mnt/cluster
+
+[Install]
+WantedBy=multi-user.target
