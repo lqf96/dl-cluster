@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import glob, os, platform, secrets, shutil, subprocess, sys
+import os, platform, secrets, shutil, subprocess, sys
 from collections.abc import Mapping
 from argparse import ArgumentParser
 from tempfile import TemporaryDirectory
@@ -128,13 +128,12 @@ def cluster_stop():
     prompt("Stopping cluster service stack ...")
     run("docker", "stack", "rm", CLUSTER_SERVICE_NAME)
 
-def build_env_image(image_ns: str, base_image: str, shared_dir: str):
+def build_env_image(image_ns: str, base_image: str):
     # Generate environment image tag from base image name
     image_tag = base_image.replace(":", "-")
     # Build arguments
     build_args = {
-        "DL_BASE_IMAGE": base_image,
-        "DL_SHARED_DIR": shared_dir
+        "DL_BASE_IMAGE": base_image
     }
 
     # Build environment image
@@ -170,7 +169,7 @@ def build_det_images(build_image: str, det_version: str, image_ns: str):
             f"{ROOT_DIR}/bin/{DET_BUILD_SCRIPT_FILE}:/usr/local/bin/{DET_BUILD_SCRIPT_FILE}",
             f"{build_dir}:/build"
         )
-        # Environment variables for containers
+        # Environment variables for container
         envs = {
             "DL_DET_VERSION": det_version
         }
@@ -196,35 +195,27 @@ DET_CONDA_PACKAGES = (
     "nb_conda_kernels"
 )
 
-def init_shared_dir(conda_installer: str, shared_dir: str, det_version: str):
-    prompt("Installing Conda and creating directory structure ...")
-    # Install Anaconda/Miniconda
-    run("sh", conda_installer, "-b", "-p", f"{shared_dir}/conda")
-    # Create directory structure
-    mkdirp(
-        f"{shared_dir}/cache/pip",
-        f"{shared_dir}/data",
-        f"{shared_dir}/envs"
-    )
+# Script for initializing shared directory
+DET_INIT_SCRIPT_FILE = "init-dir-internal"
 
-    prompt("Creating environment and installing packages for Determined ...")
-    # Create environment for Determined
-    run(f"{shared_dir}/conda/bin/conda", "create", "-y", "-n", "determined", "python=3.9")
-    # Install Conda packages needed by Determined
-    run(
-        f"{shared_dir}/conda/bin/conda", "install", "-y", "-n", "determined",
-        "-c", "conda-forge", *DET_CONDA_PACKAGES
+def init_shared_dir(build_image: str, conda_installer: str, shared_dir: str):
+    # Bind mounts for container
+    bind_mounts = (
+        shared_dir,
+        f"{ROOT_DIR}/templates:/templates",
+        f"{ROOT_DIR}/bin/{DET_INIT_SCRIPT_FILE}:/usr/local/bin/{DET_INIT_SCRIPT_FILE}",
+        f"{conda_installer}:/conda-installer.sh"
     )
-    # Install Determined Python package
+    # Environment variables for container
+    envs = {
+        "DL_SHARED_DIR": shared_dir.split(":", 1)[-1]
+    }
+    
+    # Run initialization steps in container
     run(
-        f"{shared_dir}/conda/envs/determined/bin/pip", "install",
-        f"--cache-dir={shared_dir}/cache/pip", f"determined=={det_version}"
+        "docker", "run", "--rm", "-it", *args_list("-v", bind_mounts),
+        *args_list("-e", envs), build_image, DET_INIT_SCRIPT_FILE
     )
-
-    # Create template environments from files
-    prompt("Creating template environments ...")
-    for env_file in glob.glob(f"{ROOT_DIR}/templates/*.yml"):
-        run(f"{shared_dir}/conda/bin/conda", "env", "create", "-y", "-f", env_file)
 
 # Default base image
 DEFAULT_IMAGE = "ubuntu:20.04"
@@ -277,10 +268,6 @@ def main():
                 Arg(
                     "-b", "--base-image", default=DEFAULT_IMAGE,
                     help="Base image to build from."
-                ),
-                Arg(
-                    "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
-                    help="Path to cluster shared directory."
                 )
             )
         ),
@@ -305,6 +292,10 @@ def main():
             help="Initialize cluster shared directory.",
             args=(
                 Arg(
+                    "-b", "--build-image", default=DEFAULT_IMAGE,
+                    help="Image of temporary container to initialize shared directory."
+                ),
+                Arg(
                     "-i", "--conda-installer", required=True,
                     help="Path to Miniconda or Anaconda installer."
                 ),
@@ -312,10 +303,6 @@ def main():
                     "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
                     help="Path to cluster shared directory."
                 ),
-                Arg(
-                    "-v", "--det-version", default=DEFAULT_DET_VERSION,
-                    help="Version of Determined release."
-                )
             )
         )
     }

@@ -1,0 +1,41 @@
+#! /bin/sh
+
+# Bold text
+PROMPT_BOLD="\033[1m"
+# Colored text
+PROMPT_COLOR_GREEN="\033[92m"
+PROMPT_COLOR_WHITE="\033[97m"
+# Reset text
+PROMPT_RESET="\033[0m"
+
+prompt() {
+    # Make prompt bold and colored for terminal
+    if [ -t 0 ]; then
+        echo "${PROMPT_BOLD}${PROMPT_COLOR_GREEN}==>${PROMPT_COLOR_WHITE} $1${PROMPT_RESET}"
+    # Plain prompt
+    else
+        echo "==> $1"
+    fi
+}
+
+# Switch to shared directory
+cd "${DL_SHARED_DIR}"
+# Install Miniconda/Anaconda
+prompt "Installing Miniconda/Anaconda ..."
+sh /conda-installer.sh -b -p ./conda
+
+# Create directory structure
+prompt "Creating directory structure ..."
+mkdir -p ./cache/conda \
+    ./cache/pip \
+    ./data/shared \
+    ./data/users \
+    ./envs/templates \
+    ./envs/users
+
+export CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs/templates"
+# Create template environments from files
+prompt "Creating template environments from files ..."
+for env_file in /templates/*.yml; do
+    conda env create -y -f "${env_file}"
+done

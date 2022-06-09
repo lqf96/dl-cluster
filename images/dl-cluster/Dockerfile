@@ -18,25 +18,11 @@ RUN rm /etc/ssh/ssh_host_ecdsa_key \
 	/etc/ssh/ssh_host_ed25519_key \
 	/etc/ssh/ssh_host_rsa_key
 
-# Cluster shared directory
-ARG DL_SHARED_DIR
-# Link pip shared cache
-RUN mkdir -p /root/.cache && \
-    ln -s "${DL_SHARED_DIR}/cache/pip" /root/.cache/pip
-# Link Jupyter 
-RUN ln -s "${DL_SHARED_DIR}/conda/envs/determined/bin/jupyter" /usr/local/bin/jupyter
-# Link shared data directory
-RUN ln -s "${DL_SHARED_DIR}/data" /data
+# Copy command wrappers
+COPY det-python /usr/local/bin
+COPY det-jupyter /usr/local/bin
+# Copy pre-start hook to image
+COPY pre-start-hook.sh /root
 
-# Add Conda to path
-ENV PATH="${DL_SHARED_DIR}/conda/bin:${PATH}"
-# Conda container environments path
-ENV CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs"
-
-# Jupyter directories
-ENV JUPYTER_CONFIG_DIR=/run/determined/jupyter/config
-ENV JUPYTER_DATA_DIR=/run/determined/jupyter/data
-ENV JUPYTER_RUNTIME_DIR=/run/determined/jupyter/runtime
-# Determined entrypoint settings
-ENV DET_SKIP_PIP_INSTALL=1
-ENV DET_PYTHON_EXECUTABLE="${DL_SHARED_DIR}/conda/envs/determined/bin/python"
+# Run pre-start hook before entrypoint script
+ENV BASH_ENV="/root/pre-start-hook.sh"

@@ -1,0 +1,12 @@
+name: cluster
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - jupyterlab
+  - jupyter-archive
+  - tensorboard
+  - nb_conda_kernels
+  - pip
+  - pip:
+    - determined
