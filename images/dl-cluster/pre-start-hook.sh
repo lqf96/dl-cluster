@@ -27,6 +27,10 @@ export JUPYTER_CONFIG_DIR=/run/determined/jupyter/config
 export JUPYTER_DATA_DIR=/run/determined/jupyter/data
 export JUPYTER_RUNTIME_DIR=/run/determined/jupyter/runtime
 
+# NCCL settings
+export NCCL_SOCKET_NTHREADS=2
+export NCCL_NSOCKS_PERTHREAD=6
+
 # Initialize user directories
 mkdir -p "${DL_USER_DATA_DIR}" "${DL_USER_ENVS_DIR}"
 # Change working directory
