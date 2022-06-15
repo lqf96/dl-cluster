@@ -8,6 +8,7 @@ dependencies:
   - pytorch=1.11
   - cudatoolkit=11.3
   - numpy
+  - ipykernel
   - pip
   - pip:
     - determined
