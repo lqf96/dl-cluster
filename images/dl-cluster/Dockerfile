@@ -22,7 +22,7 @@ RUN rm /etc/ssh/ssh_host_ecdsa_key \
 COPY det-python /usr/local/bin
 COPY jupyter /usr/local/bin
 # Copy pre-start hook to image
-COPY pre-start-hook.sh /root
+COPY pre-start-hook.bash /root
 
 # Run pre-start hook before entrypoint script
 ENV BASH_ENV="/root/pre-start-hook.bash"
