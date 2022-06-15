@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 # Bold text
 PROMPT_BOLD="\033[1m"
@@ -23,6 +23,8 @@ cd "${DL_SHARED_DIR}"
 # Install Miniconda/Anaconda
 prompt "Installing Miniconda/Anaconda ..."
 sh /conda-installer.sh -b -p ./conda
+# Initialize Conda for current shell
+eval "$(${DL_SHARED_DIR}/conda/bin/conda shell.bash hook)"
 
 # Create directory structure
 prompt "Creating directory structure ..."
@@ -33,7 +35,12 @@ mkdir -p ./cache/conda \
     ./envs/templates \
     ./envs/users
 
+# Cache directories
+export CONDA_PKGS_DIRS="${DL_SHARED_DIR}/cache/conda"
+export PIP_CACHE_DIR="${DL_SHARED_DIR}/cache/pip"
+# Template environments directory
 export CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs/templates"
+
 # Create template environments from files
 prompt "Creating template environments from files ..."
 for env_file in /templates/*.yml; do

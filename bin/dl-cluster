@@ -201,14 +201,14 @@ DET_INIT_SCRIPT_FILE = "init-dir-internal"
 def init_shared_dir(build_image: str, conda_installer: str, shared_dir: str):
     # Bind mounts for container
     bind_mounts = (
-        shared_dir,
+        f"{shared_dir}:{shared_dir}",
         f"{ROOT_DIR}/templates:/templates",
         f"{ROOT_DIR}/bin/{DET_INIT_SCRIPT_FILE}:/usr/local/bin/{DET_INIT_SCRIPT_FILE}",
         f"{conda_installer}:/conda-installer.sh"
     )
     # Environment variables for container
     envs = {
-        "DL_SHARED_DIR": shared_dir.split(":", 1)[-1]
+        "DL_SHARED_DIR": shared_dir
     }
     
     # Run initialization steps in container

@@ -25,4 +25,4 @@ COPY det-jupyter /usr/local/bin
 COPY pre-start-hook.sh /root
 
 # Run pre-start hook before entrypoint script
-ENV BASH_ENV="/root/pre-start-hook.sh"
+ENV BASH_ENV="/root/pre-start-hook.bash"
