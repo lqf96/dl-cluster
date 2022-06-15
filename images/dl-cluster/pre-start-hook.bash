@@ -20,8 +20,6 @@ export CONDA_ENVS_PATH="${DL_USER_ENVS_DIR}:${DL_SHARED_DIR}/envs/templates"
 export DET_SKIP_PIP_INSTALL=1
 export DET_PYTHON_EXECUTABLE="det-python"
 
-# Run Jupyter through wrapper script
-alias jupyter="det-jupyter"
 # Jupyter directories
 export JUPYTER_CONFIG_DIR=/run/determined/jupyter/config
 export JUPYTER_DATA_DIR=/run/determined/jupyter/data

@@ -20,7 +20,7 @@ RUN rm /etc/ssh/ssh_host_ecdsa_key \
 
 # Copy command wrappers
 COPY det-python /usr/local/bin
-COPY det-jupyter /usr/local/bin
+COPY jupyter /usr/local/bin
 # Copy pre-start hook to image
 COPY pre-start-hook.sh /root
 
