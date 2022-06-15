@@ -44,5 +44,5 @@ export CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs/templates"
 # Create template environments from files
 prompt "Creating template environments from files ..."
 for env_file in /templates/*.yml; do
-    conda env create -y -f "${env_file}"
+    conda env create -f "${env_file}"
 done
