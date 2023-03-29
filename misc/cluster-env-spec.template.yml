@@ -1,13 +1,12 @@
-name: cluster
 channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
+  - python={dl_python_version}
   - jupyterlab
   - jupyter-archive
   - tensorboard
-  - nb_conda_kernels
   - pip
   - pip:
-    - determined
+    - determined={dl_det_version}
+    - tensorboard-plugin-profile

@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import os, platform, secrets, shutil, subprocess, sys
+import os, platform, secrets, shutil, subprocess, sys, json, curses
 from collections.abc import Mapping
 from argparse import ArgumentParser
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 
 if TYPE_CHECKING:
     from typing import Any, Optional, TextIO, Union
@@ -15,14 +15,19 @@ if TYPE_CHECKING:
 # Root (repository) directory
 ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
 
+curses.setupterm()
+
+def tput(cap_name: str, *args: int) -> str:
+    return curses.tparm(curses.tigetstr(cap_name), *args).decode()
+
 # Bold text
-PROMPT_BOLD = "\033[1m"
+PROMPT_BOLD = tput("bold")
 # Colored text
-PROMPT_COLOR_RED = "\033[91m"
-PROMPT_COLOR_GREEN = "\033[92m"
-PROMPT_COLOR_WHITE = "\033[97m"
+PROMPT_COLOR_RED = tput("setaf", 1)
+PROMPT_COLOR_GREEN = tput("setaf", 2)
+PROMPT_COLOR_WHITE = tput("setaf", 7)
 # Reset text
-PROMPT_RESET = "\033[0m"
+PROMPT_RESET = tput("sgr0")
 
 class Arg:
     def __init__(self, *names_or_flags: str, **kwargs: Any):
@@ -80,10 +85,10 @@ def run(program: str, *args: str):
         prompt(f"Error: Command {proc.args} returned with code {proc.returncode}", color_seq=PROMPT_COLOR_RED)
         exit(1)
 
-def args_list(flag: str, args: Union[Iterable[str], Mapping[str, str]]) -> Iterator[str]:
+def args_list(flag: str, args: Union[Iterable[str], Mapping[str, str]], sep: str = "=") -> Iterator[str]:
     # Concatenate key-value pair into a single argument
     if isinstance(args, Mapping):
-        args = (f"{key}={value}" for key, value in args.items())
+        args = (key+sep+value for key, value in args.items())
     # Interleave flags with arguments
     for arg in args:
         yield flag
@@ -107,16 +112,56 @@ def registry_stop():
     prompt("Stopping registry mirror service ...")
     run("docker-compose", "--project-directory", REGISTRY_SERVICE_DIR, "down")
 
+# Required cluster configuration items
+REQUIRED_CONFIG_ITEMS = (
+    "cf_tunnel",
+)
+# Default cluster configuration
+DEFAULT_CONFIG = {
+    "det_image_ns": "determinedai",
+    "det_version": "0.21.0",
+    "shared_dir": "/mnt/cluster",
+    "default_env_prefix": "dl-cluster",
+    "python_version": "3.10"
+}
+
+def load_cluster_config(config_path: str) -> dict[str, str]:
+    # Load cluster configuration
+    with open(config_path) as f_config:
+        config: dict[str, str] = json.load(f)
+    
+    # Check required items
+    for item in REQUIRED_CONFIG_ITEMS:
+        if item not in config:
+            raise ValueError(f"missing required configuration item: '{item}'")
+    # Merge default configuration
+    for item, default_value in DEFAULT_CONFIG.items():
+        config.setdefault(item, default_value)
+    
+    return config
+
 # Cluster service stack directory
 CLUSTER_SERVICE_NAME = "dl-cluster"
-# Cluster service stack name
+# Cluster service stack file
 CLUSTER_SERVICE_FILE = f"{ROOT_DIR}/services/cluster/docker-compose.yml"
 
-def cluster_start(shared_dir: str, det_version: str):
-    # Set variables for service stack
-    os.environ["DL_CLUSTER_MASTER"] = platform.node()
-    os.environ["DL_DET_VERSION"] = det_version
-    os.environ["DL_SHARED_DIR"] = shared_dir
+def cluster_start(cluster_config: str):
+    prompt("Loading and applying cluster configuration ...")
+    # Load cluster configuration from file
+    config = load_cluster_config(cluster_config)
+    # Configuration items
+    det_version = config["det_version"]
+    default_env = config["default_env_prefix"]+"-"+det_version
+    # Set environment variables for service stack
+    os.environ.update({
+        "DL_CLUSTER_MASTER": platform.node(),
+        "DL_DET_IMAGE_NS": config["det_image_ns"],
+        "DL_DET_VERSION": config["det_version"],
+        "DL_SHARED_DIR": config["shared_dir"],
+        "DL_CF_TUNNEL": config["cf_tunnel"],
+        "DL_DEFAULT_ENV": default_env
+    })
+    
     # Start service stack
     prompt("Starting cluster service stack ...")
     run("docker", "stack", "deploy", "-c", CLUSTER_SERVICE_FILE, CLUSTER_SERVICE_NAME)
@@ -187,28 +232,43 @@ def build_det_images(build_image: str, det_version: str, image_ns: str):
         prompt(f"Creating agent image ...")
         make_det_image("agent", det_version, image_ns, build_dir)
 
-# Conda packages needed by Determined
-DET_CONDA_PACKAGES = (
-    "jupyterlab",
-    "jupyter-archive",
-    "tensorboard",
-    "nb_conda_kernels"
-)
-
 # Script for initializing shared directory
 DET_INIT_SCRIPT_FILE = "init-dir-internal"
 
-def init_shared_dir(build_image: str, conda_installer: str, shared_dir: str):
+def init_shared_dir(cluster_config: str, conda_installer: str, reinstall_conda: bool, delete_data: bool,
+    build_image: str):
+    prompt("Loading cluster configuration ...")
+    # Load cluster configuration from file
+    config = load_cluster_config(cluster_config)
+    # Configuration items
+    det_version = config["det_version"]
+    shared_dir = config["shared_dir"]
+    default_env = config["default_env_prefix"]+"-"+det_version
+
+    prompt("Creating cluster environment specification ...")
+    # Load and instantiate specification template
+    with open(f"{ROOT_DIR}/misc/cluster-env-spec.template.yml") as f_template:
+        cluster_env_spec = f_template.read().format(
+            dl_python_version=config["python_version"],
+            dl_det_version=det_version
+        )
+    # Save environment specification to temporary file
+    with NamedTemporaryFile("w", delete=False) as f_spec:
+        f_spec.write(cluster_env_spec)
+
     # Bind mounts for container
     bind_mounts = (
         f"{shared_dir}:{shared_dir}",
-        f"{ROOT_DIR}/templates:/templates",
         f"{ROOT_DIR}/bin/{DET_INIT_SCRIPT_FILE}:/usr/local/bin/{DET_INIT_SCRIPT_FILE}",
-        f"{conda_installer}:/conda-installer.sh"
+        f"{conda_installer}:/tmp/conda-installer.sh",
+        f"{f_spec.name}:/tmp/cluster-env-spec.yml"
     )
     # Environment variables for container
     envs = {
-        "DL_SHARED_DIR": shared_dir
+        "DL_SHARED_DIR": shared_dir,
+        "DL_REINSTALL_CONDA": str(int(reinstall_conda)),
+        "DL_DELETE_DATA": str(int(delete_data)),
+        "DL_DEFAULT_ENV": default_env
     }
     
     # Run initialization steps in container
@@ -217,12 +277,13 @@ def init_shared_dir(build_image: str, conda_installer: str, shared_dir: str):
         *args_list("-e", envs), build_image, DET_INIT_SCRIPT_FILE
     )
 
+    # Remove temporary file
+    os.unlink(f_spec.name)
+
+# Default cluster configuration path
+DEFAULT_CONFIG_PATH = f"{ROOT_DIR}/etc/dl-cluster/config.json"
 # Default base image
 DEFAULT_IMAGE = "ubuntu:20.04"
-# Default cluster shared directory
-DEFAULT_SHARED_DIR = "/mnt/cluster"
-# Default Determined release version
-DEFAULT_DET_VERSION = "0.18.0"
 
 def main():
     # CLI commands
@@ -242,13 +303,9 @@ def main():
             help="Start DL cluster service stack.",
             args=(
                 Arg(
-                    "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
-                    help="Path to cluster shared directory."
+                    "-c", "--cluster-config", default=DEFAULT_CONFIG_PATH,
+                    help="Path to the cluster configuration file."
                 ),
-                Arg(
-                    "-v", "--det-version", default=DEFAULT_DET_VERSION,
-                    help="Version of Determined release."
-                )
             )
         ),
         "cluster-status": Command(
@@ -283,7 +340,7 @@ def main():
                     help="Image of temporary container to build Determined binaries."
                 ),
                 Arg(
-                    "-v", "--det-version", default=DEFAULT_DET_VERSION,
+                    "-v", "--det-version", default=DEFAULT_CONFIG["det_version"],
                     help="Version of Determined release."
                 )
             )
@@ -292,17 +349,25 @@ def main():
             help="Initialize cluster shared directory.",
             args=(
                 Arg(
-                    "-b", "--build-image", default=DEFAULT_IMAGE,
-                    help="Image of temporary container to initialize shared directory."
+                    "-c", "--cluster-config", default=DEFAULT_CONFIG_PATH,
+                    help="Path to the cluster configuration file."
                 ),
                 Arg(
                     "-i", "--conda-installer", required=True,
                     help="Path to Miniconda or Anaconda installer."
                 ),
                 Arg(
-                    "-d", "--shared-dir", default=DEFAULT_SHARED_DIR,
-                    help="Path to cluster shared directory."
+                    "-b", "--build-image", default=DEFAULT_IMAGE,
+                    help="Image of temporary container to initialize shared directory."
                 ),
+                Arg(
+                    "--reinstall-conda", default=False, action="store_true",
+                    help="Reinstall Miniconda or Anaconda."
+                ),
+                Arg(
+                    "--delete-data", default=False, action="store_true",
+                    help="Delete existing data in shared directory"
+                )
             )
         )
     }

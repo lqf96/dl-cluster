@@ -6,7 +6,9 @@ task_container_defaults:
   bind_mounts:
     - host_path: {{ env "DL_SHARED_DIR" }}
       container_path: {{ env "DL_SHARED_DIR" }}
-  work_dir: {{ env "DL_SHARED_DIR" }}
+  environment_variables:
+    - DL_SHARED_DIR={{ env "DL_SHARED_DIR" }}
+    - DL_DEFAULT_ENV={{ env "DL_DEFAULT_ENV" }}
 cluster_name: nsl-cluster-1
 db:
   host: db

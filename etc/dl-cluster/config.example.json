@@ -1,0 +1,8 @@
+{
+    "det_image_ns": "determinedai",
+    "det_version": "0.21.0",
+    "shared_dir": "/mnt/cluster",
+    "cf_tunnel": "your_cf_tunnel_name_here",
+    "default_env_prefix": "dl-cluster",
+    "python_version": "3.10"
+}

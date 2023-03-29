@@ -1,12 +1,12 @@
 #! /bin/bash
 
 # Bold text
-PROMPT_BOLD="\033[1m"
+PROMPT_BOLD="$(tput bold)"
 # Colored text
-PROMPT_COLOR_GREEN="\033[92m"
-PROMPT_COLOR_WHITE="\033[97m"
+PROMPT_COLOR_GREEN="$(tput setaf 2)"
+PROMPT_COLOR_WHITE="$(tput setaf 7)"
 # Reset text
-PROMPT_RESET="\033[0m"
+PROMPT_RESET="$(tput sgr0)"
 
 prompt() {
     # Make prompt bold and colored for terminal
@@ -20,29 +20,36 @@ prompt() {
 
 # Switch to shared directory
 cd "${DL_SHARED_DIR}"
+
 # Install Miniconda/Anaconda
 prompt "Installing Miniconda/Anaconda ..."
-sh /conda-installer.sh -b -p ./conda
+if [ "${DL_REINSTALL_CONDA}" = "1" ]; then
+    rm -rf ./conda
+fi
+sh /tmp/conda-installer.sh -b -p ./conda
 # Initialize Conda for current shell
-eval "$(${DL_SHARED_DIR}/conda/bin/conda shell.bash hook)"
+eval "$(./conda/bin/conda shell.bash hook)"
 
 # Create directory structure
 prompt "Creating directory structure ..."
+if [ "${DL_DELETE_DATA}" = "1" ]; then
+    rm -rf ./cache \
+        ./data \
+        ./env
+fi
 mkdir -p ./cache/conda \
     ./cache/pip \
     ./data/shared \
     ./data/users \
-    ./envs/templates \
-    ./envs/users
+    ./env/shared \
+    ./env/users
 
 # Cache directories
 export CONDA_PKGS_DIRS="${DL_SHARED_DIR}/cache/conda"
 export PIP_CACHE_DIR="${DL_SHARED_DIR}/cache/pip"
-# Template environments directory
-export CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs/templates"
+# Shared environments directory
+export CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs/shared"
 
-# Create template environments from files
-prompt "Creating template environments from files ..."
-for env_file in /templates/*.yml; do
-    conda env create -f "${env_file}"
-done
+# Create cluster environment
+prompt "Creating cluster environment from specification ..."
+conda env create -f /tmp/cluster-env-spec.yml -n "${DL_DEFAULT_ENV}"

@@ -1,4 +1,0 @@
-#! /bin/sh
-
-# Execute Jupyter in cluster environment
-exec "${DL_SHARED_DIR}/envs/templates/${DL_CLUSTER_ENV}/bin/jupyter" "$@"

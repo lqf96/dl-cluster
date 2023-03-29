@@ -36,16 +36,17 @@ services:
       - dl-cluster-db:/var/lib/postgresql/data
   master:
     <<: *master-service
-    image: lqf96/determined-master:${DL_DET_VERSION}
+    image: ${DL_DET_IMAGE_NS}/determined-master:${DL_DET_VERSION}
     configs:
       - source: cluster-master-config
         target: /etc/determined/master.yaml
     environment:
       - DL_SHARED_DIR
+      - DL_DEFAULT_ENV
     secrets:
       - db-passwd
   agent:
-    image: lqf96/determined-agent:${DL_DET_VERSION}
+    image: ${DL_DET_IMAGE_NS}/determined-agent:${DL_DET_VERSION}
     configs:
       - source: cluster-agent-config
         target: /etc/determined/agent.yaml
@@ -62,6 +63,6 @@ services:
   reverse-proxy:
     <<: *master-service
     image: cloudflare/cloudflared
-    command: tunnel run --url http://master:8080 ${DL_CLUSTER_TUNNEL:-nsl-cluster-1}
+    command: tunnel run --url http://master:8080 ${DL_CF_TUNNEL}
     volumes:
       - ../../secrets/cloudflared:/etc/cloudflared

@@ -1,11 +1,6 @@
 # Ensure hook is only called once
 unset BASH_ENV
 
-# Save current directory as shared directory
-export DL_SHARED_DIR="${PWD}"
-# Set cluster environment name
-export DL_CLUSTER_ENV="cluster"
-
 # User data and environment directories
 DL_USER_DATA_DIR="${DL_SHARED_DIR}/data/users/${DET_USER}"
 DL_USER_ENVS_DIR="${DL_SHARED_DIR}/envs/users/${DET_USER}"
@@ -14,11 +9,10 @@ DL_USER_ENVS_DIR="${DL_SHARED_DIR}/envs/users/${DET_USER}"
 export CONDA_PKGS_DIRS="${DL_SHARED_DIR}/cache/conda"
 export PIP_CACHE_DIR="${DL_SHARED_DIR}/cache/pip"
 # Conda environments directories
-export CONDA_ENVS_PATH="${DL_USER_ENVS_DIR}:${DL_SHARED_DIR}/envs/templates"
+export CONDA_ENVS_PATH="${DL_USER_ENVS_DIR}:${DL_SHARED_DIR}/envs/shared"
 
 # Determined settings
 export DET_SKIP_PIP_INSTALL=1
-export DET_PYTHON_EXECUTABLE="det-python"
 
 # Jupyter directories
 export JUPYTER_CONFIG_DIR=/run/determined/jupyter/config
@@ -31,14 +25,22 @@ export NCCL_NSOCKS_PERTHREAD=6
 
 # Initialize user directories
 mkdir -p "${DL_USER_DATA_DIR}" "${DL_USER_ENVS_DIR}"
-# Change working directory
-cd "${DL_USER_DATA_DIR}"
+# Use user data directory as home directory
+ln -s "${DL_USER_DATA_DIR}" "${HOME}"
 # Create link to shared data directory
-if [ ! -e "./shared" ]; then
-    ln -s ../../shared ./
+if [ ! -e "${HOME}/shared" ]; then
+    ln -s "${DL_SHARED_DIR}/data/shared" "${HOME}/shared"
+fi
+# Switch to home directory except for experiments
+if [ "${DET_TASK_TYPE}" != "TRIAL" ]; then
+    cd "${HOME}"
 fi
 
 # Initialize Conda for current shell
 eval "$(${DL_SHARED_DIR}/conda/bin/conda shell.bash hook)"
-# Initialize Conda for interactive shells
+# Persistently initialize Conda for interactive shells
 conda init
+# Display short environment prompt
+conda config --set env_prompt '({name}) '
+# Activate default cluster environment
+conda activate "${DL_DEFAULT_ENV}"
