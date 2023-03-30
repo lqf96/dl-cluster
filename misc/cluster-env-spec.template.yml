@@ -8,5 +8,5 @@ dependencies:
   - tensorboard
   - pip
   - pip:
-    - determined={dl_det_version}
+    - determined=={dl_det_version}
     - tensorboard-plugin-profile

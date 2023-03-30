@@ -42,7 +42,7 @@ services:
         target: /etc/determined/master.yaml
     environment:
       - DL_SHARED_DIR
-      - DL_DEFAULT_ENV
+      - DL_CLUSTER_ENV
     secrets:
       - db-passwd
   agent:

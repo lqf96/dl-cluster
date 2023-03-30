@@ -121,14 +121,14 @@ DEFAULT_CONFIG = {
     "det_image_ns": "determinedai",
     "det_version": "0.21.0",
     "shared_dir": "/mnt/cluster",
-    "default_env_prefix": "dl-cluster",
+    "cluster_env_prefix": "dl-cluster",
     "python_version": "3.10"
 }
 
 def load_cluster_config(config_path: str) -> dict[str, str]:
     # Load cluster configuration
     with open(config_path) as f_config:
-        config: dict[str, str] = json.load(f)
+        config: dict[str, str] = json.load(f_config)
     
     # Check required items
     for item in REQUIRED_CONFIG_ITEMS:
@@ -151,7 +151,7 @@ def cluster_start(cluster_config: str):
     config = load_cluster_config(cluster_config)
     # Configuration items
     det_version = config["det_version"]
-    default_env = config["default_env_prefix"]+"-"+det_version
+    cluster_env = config["cluster_env_prefix"]+"-"+det_version
     # Set environment variables for service stack
     os.environ.update({
         "DL_CLUSTER_MASTER": platform.node(),
@@ -159,7 +159,7 @@ def cluster_start(cluster_config: str):
         "DL_DET_VERSION": config["det_version"],
         "DL_SHARED_DIR": config["shared_dir"],
         "DL_CF_TUNNEL": config["cf_tunnel"],
-        "DL_DEFAULT_ENV": default_env
+        "DL_CLUSTER_ENV": cluster_env
     })
     
     # Start service stack
@@ -243,7 +243,7 @@ def init_shared_dir(cluster_config: str, conda_installer: str, reinstall_conda: 
     # Configuration items
     det_version = config["det_version"]
     shared_dir = config["shared_dir"]
-    default_env = config["default_env_prefix"]+"-"+det_version
+    cluster_env = config["cluster_env_prefix"]+"-"+det_version
 
     prompt("Creating cluster environment specification ...")
     # Load and instantiate specification template
@@ -268,7 +268,7 @@ def init_shared_dir(cluster_config: str, conda_installer: str, reinstall_conda: 
         "DL_SHARED_DIR": shared_dir,
         "DL_REINSTALL_CONDA": str(int(reinstall_conda)),
         "DL_DELETE_DATA": str(int(delete_data)),
-        "DL_DEFAULT_ENV": default_env
+        "DL_CLUSTER_ENV": cluster_env
     }
     
     # Run initialization steps in container

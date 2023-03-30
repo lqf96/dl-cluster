@@ -35,14 +35,14 @@ prompt "Creating directory structure ..."
 if [ "${DL_DELETE_DATA}" = "1" ]; then
     rm -rf ./cache \
         ./data \
-        ./env
+        ./envs
 fi
 mkdir -p ./cache/conda \
     ./cache/pip \
     ./data/shared \
     ./data/users \
-    ./env/shared \
-    ./env/users
+    ./envs/shared \
+    ./envs/users
 
 # Cache directories
 export CONDA_PKGS_DIRS="${DL_SHARED_DIR}/cache/conda"
@@ -52,4 +52,4 @@ export CONDA_ENVS_PATH="${DL_SHARED_DIR}/envs/shared"
 
 # Create cluster environment
 prompt "Creating cluster environment from specification ..."
-conda env create -f /tmp/cluster-env-spec.yml -n "${DL_DEFAULT_ENV}"
+conda env create -f /tmp/cluster-env-spec.yml -n "${DL_CLUSTER_ENV}"

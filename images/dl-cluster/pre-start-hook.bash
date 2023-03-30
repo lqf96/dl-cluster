@@ -24,7 +24,10 @@ export NCCL_SOCKET_NTHREADS=2
 export NCCL_NSOCKS_PERTHREAD=6
 
 # Initialize user directories
-mkdir -p "${DL_USER_DATA_DIR}" "${DL_USER_ENVS_DIR}"
+if [ ! -e "${DL_USER_DATA_DIR}" ]; then
+    cp -r /etc/skel "${DL_USER_DATA_DIR}"
+fi
+mkdir -p "${DL_USER_ENVS_DIR}"
 # Use user data directory as home directory
 ln -s "${DL_USER_DATA_DIR}" "${HOME}"
 # Create link to shared data directory
@@ -42,5 +45,3 @@ eval "$(${DL_SHARED_DIR}/conda/bin/conda shell.bash hook)"
 conda init
 # Display short environment prompt
 conda config --set env_prompt '({name}) '
-# Activate default cluster environment
-conda activate "${DL_DEFAULT_ENV}"

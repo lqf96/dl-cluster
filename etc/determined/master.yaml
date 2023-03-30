@@ -8,7 +8,7 @@ task_container_defaults:
       container_path: {{ env "DL_SHARED_DIR" }}
   environment_variables:
     - DL_SHARED_DIR={{ env "DL_SHARED_DIR" }}
-    - DL_DEFAULT_ENV={{ env "DL_DEFAULT_ENV" }}
+    - DL_CLUSTER_ENV={{ env "DL_CLUSTER_ENV" }}
 cluster_name: nsl-cluster-1
 db:
   host: db
