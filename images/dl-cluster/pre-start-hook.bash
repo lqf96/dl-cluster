@@ -13,6 +13,7 @@ export CONDA_ENVS_PATH="${DL_USER_ENVS_DIR}:${DL_SHARED_DIR}/envs/shared"
 
 # Determined settings
 export DET_SKIP_PIP_INSTALL=1
+export DET_PYTHON_EXECUTABLE="det-python"
 
 # Jupyter directories
 export JUPYTER_CONFIG_DIR=/run/determined/jupyter/config
