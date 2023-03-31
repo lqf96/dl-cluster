@@ -23,9 +23,6 @@ RUN rm /etc/ssh/ssh_host_ecdsa_key \
 # Remove home directory
 RUN rm -r /root
 
-# Copy command wrappers
-COPY det-python /usr/local/bin
-COPY jupyter /usr/local/bin
 # Copy pre-start hook script
 COPY pre-start-hook.bash /tmp
 
