@@ -12,10 +12,12 @@ export PATH="/root/go/bin:/usr/local/go/bin:${PATH}"
 apt-get update
 # Install system dependencies
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    gcc g++ python3 protobuf-compiler libprotobuf-dev make \
-    ca-certificates curl git jq
-# Manually install Go 1.18.1 toolchain
-curl https://dl.google.com/go/go1.18.1.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+    gcc g++ python3 make ca-certificates curl git jq unzip
+# Manually install Go 1.20.2 toolchain
+curl https://dl.google.com/go/go1.20.2.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+# Manually install Protobuf compiler
+curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v22.2/protoc-22.2-linux-x86_64.zip
+unzip protoc-22.2-linux-x86_64.zip -d /usr/local
 
 # Clone repository
 git clone "${DL_DET_REPO}" /root/determined

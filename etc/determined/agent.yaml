@@ -1,2 +1,7 @@
 master_host: master
 master_port: 8080
+fluent:
+  image: fluent/fluent-bit:1.9.3
+  port: 24224
+  container_name: determined-fluent
+  network: dl-cluster

@@ -16,3 +16,6 @@ db:
   port: 5432
   user: postgres
   password: {{ secret "db-passwd" }}
+checkpoint_storage:
++  type: shared_fs
++  host_path: /mnt/cluster/checkpoints
