@@ -21,6 +21,8 @@ RUN PIP_NO_CACHE_DIR=0 conda env create -f /tmp/cluster-env-spec.yml -n dl-clust
 
 # Remove home directory
 RUN rm -r /root
+# Copy command wrappers
+COPY det-jupyter-wrapper /usr/local/bin/det-jupyter-wrapper
 # Copy pre-start hook script
 RUN mkdir -p /usr/local/share/dl-cluster
 COPY pre-start-hook.bash /usr/local/share/dl-cluster
@@ -36,4 +38,4 @@ ENV NCCL_SOCKET_NTHREADS=2
 ENV NCCL_NSOCKS_PERTHREAD=6
 
 # Run pre-start hook before entrypoint script
-ENV BASH_ENV="/usr/local/share/dl-cluster/pre-start-hook.bash"
+ENV BASH_ENV=/usr/local/share/dl-cluster/pre-start-hook.bash

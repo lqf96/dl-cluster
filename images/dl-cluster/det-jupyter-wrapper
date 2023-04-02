@@ -1,0 +1,13 @@
+#! /bin/sh
+
+# Jupyter command
+DL_JUPYTER_CMD="$1"
+shift
+
+# Inject extra configurations for Jupyter lab:
+# 1) Set root to home directory
+if [ "${DL_JUPYTER_CMD}" = "lab" ]; then
+    exec jupyter lab --ServerApp.root_dir="${HOME}" "$@"
+else
+    exec jupyter "${DL_JUPYTER_CMD}" "$@"
+fi

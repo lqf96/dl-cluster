@@ -31,18 +31,7 @@ mkdir -p "${DL_USER_ENVS_DIR}"
 
 # Notebook task
 if [ "${DET_TASK_TYPE}" = "NOTEBOOK" ]; then
-    jupyter() {
-        DL_JUPYTER_CMD="$1"
-        shift
-
-        # Inject extra configurations for Jupyter lab:
-        # 1) Set root to home directory
-        if [ "${DL_JUPYTER_CMD}" = "lab" ]; then
-            jupyter lab --ServerApp.root_dir="${HOME}" "$@"
-        else
-            jupyter "${DL_JUPYTER_CMD}" "$@"
-        fi
-    }
+    alias jupyter="det-jupyter-wrapper"
 fi
 
 # Switch to given working directory
