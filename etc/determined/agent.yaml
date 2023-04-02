@@ -4,4 +4,4 @@ fluent:
   image: fluent/fluent-bit:1.9.3
   port: 24224
   container_name: determined-fluent
-  network: dl-cluster
+  network: {{ env "DL_NETWORK_NAME" }}

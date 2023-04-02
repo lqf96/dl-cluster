@@ -1,15 +1,14 @@
 port: 8080
 task_container_defaults:
-  network_mode: dl-cluster
+  network_mode: {{ env "DL_NETWORK_NAME" }}
   direct_connectivity: true
-  image: lqf96/dl-cluster:ubuntu-20.04
+  image: {{ env "DL_ENV_IMAGE" }}
   bind_mounts:
     - host_path: {{ env "DL_SHARED_DIR" }}
       container_path: {{ env "DL_SHARED_DIR" }}
   environment_variables:
     - DL_SHARED_DIR={{ env "DL_SHARED_DIR" }}
-    - DL_CLUSTER_ENV={{ env "DL_CLUSTER_ENV" }}
-cluster_name: nsl-cluster-1
+cluster_name: {{ env "DL_CLUSTER_NAME" }}
 db:
   host: db
   name: determined
@@ -18,4 +17,4 @@ db:
   password: {{ secret "db-passwd" }}
 checkpoint_storage:
   type: shared_fs
-  host_path: /mnt/cluster/checkpoints
+  host_path: {{ env "DL_SHARED_DIR" }}/checkpoints

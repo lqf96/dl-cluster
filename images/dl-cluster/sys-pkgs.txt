@@ -1,0 +1,28 @@
+# Editors
+nano
+vim
+
+# Network-related packages
+ca-certificates
+iproute2
+# Download tools
+curl
+wget
+
+# Version management
+git
+
+# Terminal multiplexer
+tmux
+
+# Compilers and build tools
+build-essential
+automake
+autoconf
+autotools-dev
+pkg-config
+cmake
+
+# SSH
+openssh-client
+openssh-server

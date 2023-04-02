@@ -5,8 +5,8 @@ dependencies:
   - python={dl_python_version}
   - jupyterlab
   - jupyter-archive
+  - nb_conda_kernels
   - tensorboard
   - pip
   - pip:
     - determined=={dl_det_version}
-    - tensorboard-plugin-profile

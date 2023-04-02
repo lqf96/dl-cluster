@@ -5,9 +5,10 @@ configs:
     template_driver: golang
   cluster-agent-config:
     file: ../../etc/determined/agent.yaml
+    template_driver: golang
 networks:
   default:
-    name: dl-cluster
+    name: ${DL_NETWORK_NAME}
     external: true
 secrets:
   db-passwd:
@@ -41,8 +42,10 @@ services:
       - source: cluster-master-config
         target: /etc/determined/master.yaml
     environment:
+      - DL_NETWORK_NAME
+      - DL_ENV_IMAGE
       - DL_SHARED_DIR
-      - DL_CLUSTER_ENV
+      - DL_CLUSTER_NAME
     secrets:
       - db-passwd
   agent:
@@ -58,6 +61,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - DL_NETWORK_NAME
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
   reverse-proxy:
