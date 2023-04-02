@@ -5,6 +5,7 @@ FROM ${DL_BASE_IMAGE}
 # Create runtime directory for SSH server
 RUN mkdir -p /var/run/sshd
 # Update packages and install dependencies
+ARG DL_SYS_PACKAGES
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y --no-install-recommends && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${DL_SYS_PACKAGES}
@@ -12,6 +13,7 @@ RUN apt-get update && \
 RUN rm /etc/ssh/ssh_host_*_key
 
 # Create cluster environment from specification
+ARG DL_CLUSTER_ENV_SPEC
 COPY ${DL_CLUSTER_ENV_SPEC} /tmp
 RUN PIP_NO_CACHE_DIR=0 conda env create -f /tmp/cluster-env-spec.yml -n dl-cluster && \
     conda clean -a -y && \
