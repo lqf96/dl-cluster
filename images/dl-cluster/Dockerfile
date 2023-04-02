@@ -21,11 +21,10 @@ RUN PIP_NO_CACHE_DIR=0 conda env create -f /tmp/cluster-env-spec.yml -n dl-clust
 
 # Remove home directory
 RUN rm -r /root
-# Copy command wrappers
-COPY det-jupyter-wrapper /usr/local/bin/det-jupyter-wrapper
-# Copy pre-start hook script
+# Copy helper scripts
 RUN mkdir -p /usr/local/share/dl-cluster
 COPY pre-start-hook.bash /usr/local/share/dl-cluster
+COPY det-jupyter-wrapper /usr/local/share/dl-cluster
 
 # Jupyter directories
 ENV JUPYTER_CONFIG_DIR=/run/determined/jupyter/config
