@@ -14,7 +14,7 @@ RUN rm /etc/ssh/ssh_host_*_key
 # Create cluster environment from specification
 COPY ${DL_CLUSTER_ENV_SPEC} /tmp
 RUN PIP_NO_CACHE_DIR=0 conda env create -f /tmp/cluster-env-spec.yml -n dl-cluster && \
-    conda clean -a && \
+    conda clean -a -y && \
     rm -r /tmp/cluster-env-spec.yml
 
 # Remove home directory
