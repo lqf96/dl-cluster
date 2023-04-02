@@ -149,7 +149,7 @@ CLUSTER_SERVICE_NAME = "dl-cluster"
 CLUSTER_SERVICE_FILE = f"{ROOT_DIR}/services/cluster/docker-compose.yml"
 
 def format_env_image_version(base_image: str, python_version: str, det_version: str) -> str:
-    image_version = base_image.replace(":", "-")
+    image_version = base_image.replace("/", "-").replace(":", "-")
     image_version += "-py-"+python_version
     image_version += "-det-"+det_version
 
@@ -210,9 +210,6 @@ def build_env_image(cluster_config: str):
             dl_python_version=config["python_version"],
             dl_det_version=config["det_version"]
         )
-    # Write specification to temporary file
-    with NamedTemporaryFile("w", delete=False) as f_spec:
-        f_spec.write(cluster_env_spec)
     
     # Image version
     env_base_image = config["env_base_image"]
@@ -222,20 +219,23 @@ def build_env_image(cluster_config: str):
     # Build arguments
     build_args = {
         "DL_BASE_IMAGE": env_base_image,
-        "DL_SYS_PACKAGES": sys_pkgs,
-        "DL_CLUSTER_ENV_SPEC": f_spec.name
+        "DL_SYS_PACKAGES": sys_pkgs
     }
     
     prompt(f"Building Determined environment image from '{env_base_image}' ...")
     # Build environment image
-    env_image_name = config["env_image_name"]
-    run(
-        "docker", "build", "-t", f"{env_image_name}:{env_image_version}",
-        *args_list("--build-arg", build_args), ENV_IMAGE_DIR
-    )
-
-    # Remove environment specification
-    os.unlink(f_spec.name)
+    with NamedTemporaryFile("w", prefix=".", dir=ENV_IMAGE_DIR) as f_spec:
+        # Write specification to temporary file
+        f_spec.write(cluster_env_spec)
+        f_spec.flush()
+        # Get specification file name
+        build_args["DL_CLUSTER_ENV_SPEC"] = os.path.basename(f_spec.name)
+        
+        env_image_name = config["env_image_name"]
+        run(
+            "docker", "build", "-t", f"{env_image_name}:{env_image_version}",
+            *args_list("--build-arg", build_args), ENV_IMAGE_DIR
+        )
 
 def make_det_image(role: str, det_version: str, image_ns: str, build_dir: str):
     # Generate random temporary container name
@@ -285,6 +285,10 @@ def build_det_images(build_image: str, det_version: str, image_ns: str):
 DET_INIT_SCRIPT_FILE = "init-dir-internal"
 
 def init_shared_dir(cluster_config: str, delete_data: bool):
+    # Shared directory must be initialized as root
+    if os.getuid()!=0:
+        raise RuntimeError("you must initialize shared directory as root")
+
     # Load cluster configuration from file
     config = load_cluster_config(cluster_config)
     # Shared directory
