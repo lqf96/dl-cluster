@@ -19,7 +19,7 @@ if [ ! -e "${DL_USER_DATA_DIR}" ]; then
     ln -s "${DL_USER_DATA_DIR}" "${HOME}"
     # Create link to shared data directory
     ln -s "${DL_SHARED_DIR}/data/shared" "${HOME}/shared"
-    
+
     # Persistently initialize Conda for interactive shells
     conda init
     # Display short environment prompt
@@ -36,4 +36,4 @@ if [ "${DET_TASK_TYPE}" != "TRIAL" ]; then
 fi
 
 # Activate cluster environment
-conda activate dl-cluster
+source /opt/conda/bin/activate dl-cluster
