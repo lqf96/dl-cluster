@@ -11,29 +11,46 @@ export PIP_CACHE_DIR="${DL_SHARED_DIR}/cache/pip"
 # Conda environments directories
 export CONDA_ENVS_PATH="${DL_USER_ENVS_DIR}:${DL_SHARED_DIR}/envs/shared"
 
+# Link user data directory
+if [ -e "${DL_USER_DATA_DIR}" ]; then
+    ln -s "${DL_USER_DATA_DIR}" "${HOME}"
 # Initialize user data directory
-if [ ! -e "${DL_USER_DATA_DIR}" ]; then
+else
     # Copy user skeleton directory
     cp -r /etc/skel "${DL_USER_DATA_DIR}"
-    # Use user data directory as home directory
+    # Link user data directory
     ln -s "${DL_USER_DATA_DIR}" "${HOME}"
     # Create link to shared data directory
     ln -s "${DL_SHARED_DIR}/data/shared" "${HOME}/shared"
 
     # Persistently initialize Conda for interactive shells
     conda init
-    # Display short environment prompt
-    conda config --set env_prompt '({name}) '
-else
-    ln -s "${DL_USER_DATA_DIR}" "${HOME}"
 fi
 # Create user environments directory
 mkdir -p "${DL_USER_ENVS_DIR}"
 
-# Switch to home directory except for experiments
-if [ "${DET_TASK_TYPE}" != "TRIAL" ]; then
-    cd "${HOME}"
+# Notebook task
+if [ "${DET_TASK_TYPE}" = "NOTEBOOK" ]; then
+    jupyter() {
+        DL_JUPYTER_CMD="$1"
+        shift
+
+        # Inject extra configurations for Jupyter lab:
+        # 1) Set root to home directory
+        if [ "${DL_JUPYTER_CMD}" = "lab" ]; then
+            jupyter lab --ServerApp.root_dir="${HOME}" "$@"
+        else
+            jupyter "${DL_JUPYTER_CMD}" "$@"
+        fi
+    }
 fi
 
-# Activate cluster environment
-source /opt/conda/bin/activate dl-cluster
+# Switch to given working directory
+# (Unlike `workdir` option, this allows switching to home and its
+# sub-directories, as switching happens after linking)
+if [ -n "${DL_WORKDIR}" ]; then
+    cd "${DL_WORKDIR}"
+fi
+# Activate Conda environment
+# (Cluster environment by default)
+. /opt/conda/bin/activate "${DL_CONDA_ENV:-dl-cluster}"
