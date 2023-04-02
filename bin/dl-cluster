@@ -175,7 +175,8 @@ def cluster_start(cluster_config: str):
         "DL_NETWORK_NAME": config["network_name"],
         "DL_ENV_IMAGE": env_image,
         "DL_SHARED_DIR": config["shared_dir"],
-        "DL_CLUSTER_NAME": config["cluster_name"]
+        "DL_CLUSTER_NAME": config["cluster_name"],
+        "DL_CF_TUNNEL": config["cf_tunnel"]
     })
     
     # Start service stack
